@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GST Tax Invoice Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --ink: #1a1a1a;
+    --ink-light: #444;
+    --rule: #c8c0b0;
+    --rule-dark: #8a8070;
+    --bg: #f5f2ed;
+    --paper: #fdfcfa;
+    --accent: #b85c00;
+    --accent-soft: #f0e8df;
+    --section-bg: #f8f6f2;
+    --remove: #7c1c1c;
+    --shadow: 0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  .app-header {
+    background: var(--ink);
+    color: #fff;
+    padding: 16px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 3px solid var(--accent);
+  }
+  .app-header h1 { font-family:'DM Serif Display',serif; font-size:1.4rem; color:#fff; }
+  .app-header span { font-size:0.74rem; color:#aaa; font-weight:300; letter-spacing:0.1em; text-transform:uppercase; }
+  .btn-top {
+    background:var(--accent); color:#fff; border:none;
+    padding:10px 24px; font-family:'DM Sans',sans-serif; font-size:0.82rem;
+    font-weight:600; letter-spacing:0.06em; text-transform:uppercase;
+    cursor:pointer; border-radius:2px; transition:background 0.2s;
+  }
+  .btn-top:hover { background:#8f4400; }
+
+  .app-body {
+    max-width:1200px; margin:0 auto;
+    padding:24px 20px 52px;
+    display:flex; flex-direction:column; gap:18px;
+  }
+
+  .card {
+    background:var(--paper); border:1px solid var(--rule);
+    border-radius:3px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .card-head {
+    background:var(--ink); color:#fff;
+    padding:9px 18px; font-size:0.69rem; font-weight:600;
+    letter-spacing:0.12em; text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card-head::before {
+    content:''; display:inline-block;
+    width:3px; height:12px; background:var(--accent); border-radius:1px;
+  }
+  .card-body { padding:16px 18px; }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:11px; }
+  .span-2 { grid-column:span 2; }
+  .span-3 { grid-column:span 3; }
+
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field label {
+    font-size:0.63rem; font-weight:600; letter-spacing:0.09em;
+    text-transform:uppercase; color:var(--rule-dark);
+  }
+  .field input, .field textarea {
+    border:1px solid var(--rule); background:var(--section-bg);
+    color:var(--ink); padding:7px 10px;
+    font-family:'DM Sans',sans-serif; font-size:0.84rem;
+    border-radius:2px; outline:none;
+    transition:border-color 0.15s, background 0.15s;
+  }
+  .field input:focus, .field textarea:focus { border-color:var(--accent); background:#fff; }
+  .field textarea { resize:vertical; min-height:54px; }
+
+  .sub-head {
+    font-size:0.62rem; font-weight:700; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--accent);
+    margin:12px 0 9px; padding-bottom:4px;
+    border-bottom:1px solid var(--accent-soft);
+  }
+  .sub-head:first-child { margin-top:0; }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+
+  /* product table */
+  .product-table-wrap { overflow-x:auto; }
+  .product-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .product-table th {
+    background:var(--section-bg); border:1px solid var(--rule);
+    padding:7px 8px; text-align:left; font-size:0.64rem;
+    font-weight:600; letter-spacing:0.07em; text-transform:uppercase;
+    color:var(--ink-light); white-space:nowrap;
+  }
+  .product-table td { border:1px solid var(--rule); padding:5px 5px; vertical-align:middle; }
+  .product-table td input {
+    width:100%; border:none; background:transparent;
+    font-family:'DM Sans',sans-serif; font-size:0.83rem;
+    color:var(--ink); outline:none; padding:3px 4px;
+  }
+  .product-table td input:focus { background:var(--accent-soft); border-radius:1px; }
+  .product-table td.computed {
+    background:var(--section-bg); color:var(--ink-light);
+    font-weight:500; text-align:right; font-size:0.81rem; padding-right:8px;
+  }
+  .product-table td.remove-cell { text-align:center; width:34px; }
+  .btn-remove {
+    background:none; border:1px solid var(--rule); color:var(--remove);
+    width:23px; height:23px; border-radius:2px; cursor:pointer;
+    font-size:1rem; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.15s;
+  }
+  .btn-remove:hover { background:#fde8e8; border-color:var(--remove); }
+  .btn-add-row {
+    background:var(--accent-soft); color:var(--accent);
+    border:1px dashed var(--accent); padding:7px 16px;
+    font-family:'DM Sans',sans-serif; font-size:0.77rem; font-weight:600;
+    cursor:pointer; border-radius:2px; margin-top:10px;
+    letter-spacing:0.04em; transition:background 0.15s;
+  }
+  .btn-add-row:hover { background:#e8d5c5; }
+
+  /* totals */
+  .totals-wrap { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; }
+  .totals-block { display:flex; flex-direction:column; min-width:290px; }
+  .totals-row { display:flex; border-bottom:1px solid var(--rule); }
+  .totals-row:first-child { border-top:1px solid var(--rule); }
+  .totals-row .t-label {
+    flex:1; padding:6px 11px; font-size:0.77rem;
+    color:var(--ink-light); font-weight:500; border-right:1px solid var(--rule);
+  }
+  .totals-row .t-val {
+    width:115px; padding:6px 11px; font-size:0.82rem;
+    text-align:right; font-weight:600; font-variant-numeric:tabular-nums;
+  }
+  .totals-row.grand { background:var(--ink); border-color:var(--ink); }
+  .totals-row.grand .t-label,
+  .totals-row.grand .t-val { color:#fff; font-size:0.88rem; }
+  .amount-words {
+    background:var(--accent-soft); border:1px solid #e0cfc0;
+    padding:7px 12px; font-size:0.78rem; color:var(--ink);
+    border-radius:2px; margin-top:10px; font-style:italic;
+  }
+  .amount-words strong { font-style:normal; color:var(--accent); }
+
+  .footer-bar { display:flex; justify-content:center; padding:0 18px; }
+  .btn-pdf {
+    background:var(--accent); color:#fff; border:none;
+    padding:12px 42px; font-family:'DM Sans',sans-serif;
+    font-size:0.88rem; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; cursor:pointer; border-radius:2px;
+    box-shadow:0 4px 16px rgba(184,92,0,0.28);
+    transition:background 0.2s, transform 0.1s;
+  }
+  .btn-pdf:hover { background:#8f4400; transform:translateY(-1px); }
+  .btn-pdf:active { transform:translateY(0); }
+  .divider { border:none; border-top:1px dashed var(--rule); margin:12px 0; }
+
+  @media (max-width:768px) {
+    .app-header { padding:12px 14px; }
+    .app-body { padding:12px 10px 40px; }
+    .two-col { grid-template-columns:1fr; }
+    .grid-2,.grid-3 { grid-template-columns:1fr 1fr; }
+    .span-3 { grid-column:span 2; }
+    .btn-top { padding:8px 14px; font-size:0.74rem; }
+  }
+  @media (max-width:480px) {
+    .grid-2,.grid-3 { grid-template-columns:1fr; }
+    .span-2,.span-3 { grid-column:span 1; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>GST Invoice Generator</h1>
+    <span>Tally-Style · A4 · Indian Tax Invoice</span>
+  </div>
+  <button class="btn-top" onclick="generatePDF()">⬇ Generate PDF</button>
+</header>
+
+<div class="app-body">
+
+  <!-- ROW 1: Seller+Buyer (left) | Invoice Details (right) -->
+  <div class="two-col">
+
+    <!-- LEFT: Seller + Consignee + Buyer stacked -->
+    <div class="card">
+      <div class="card-head">Seller &amp; Buyer Details</div>
+      <div class="card-body">
+
+        <div class="sub-head">Seller</div>
+        <div class="grid-2">
+          <div class="field span-2"><label>Company / Firm Name</label><input id="sellerName" placeholder="Abtek Flow Solutions LLP"></div>
+          <div class="field span-2"><label>Address Line 1</label><input id="sellerAddr1" placeholder="3 Floor, No.46 Room No 1, Appavoo Towers"></div>
+          <div class="field span-2"><label>Address Line 2</label><input id="sellerAddr2" placeholder="West Madha Church Road, Royapuram"></div>
+          <div class="field"><label>City</label><input id="sellerCity" placeholder="Chennai"></div>
+          <div class="field"><label>Pincode</label><input id="sellerPin" placeholder="600013"></div>
+          <div class="field span-2"><label>GSTIN / UIN</label><input id="sellerGstin" placeholder="33ABNFA8308B1ZR"></div>
+          <div class="field"><label>State Name</label><input id="sellerState" placeholder="Tamil Nadu"></div>
+          <div class="field"><label>State Code</label><input id="sellerCode" placeholder="33"></div>
+          <div class="field"><label>Email</label><input id="sellerEmail" type="email" placeholder="sales@company.com"></div>
+          <div class="field"><label>Phone</label><input id="sellerPhone" placeholder="+91 98765 43210"></div>
+        </div>
+
+        <div class="sub-head">Consignee (Ship to) / Buyer (Bill to)</div>
+        <div class="grid-2">
+          <div class="field span-2"><label>Buyer / Consignee Name</label><input id="buyerName" placeholder="Sai Raj Serviceses"></div>
+          <div class="field span-2"><label>Address</label><input id="buyerAddr" placeholder="No.3, 2nd Floor S1, Janya Flat, Lakshmipuram, Chennai"></div>
+          <div class="field span-2"><label>GSTIN / UIN</label><input id="buyerGstin" placeholder="33BWLPR6343D1ZG"></div>
+          <div class="field"><label>State Name</label><input id="buyerState" placeholder="Tamil Nadu"></div>
+          <div class="field"><label>State Code</label><input id="buyerStateCode" placeholder="33"></div>
+          <div class="field span-2"><label>Place of Supply</label><input id="placeOfSupply" placeholder="Tamil Nadu"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT: Invoice Details -->
+    <div class="card">
+      <div class="card-head">Invoice Details</div>
+      <div class="card-body">
+        <div class="grid-2">
+          <div class="field"><label>Invoice Number</label><input id="invNo" placeholder="13"></div>
+          <div class="field"><label>Invoice Date</label><input id="invDate" type="date"></div>
+          <div class="field"><label>Delivery Note</label><input id="delivNote" placeholder="—"></div>
+          <div class="field"><label>Buyer's Order No.</label><input id="buyerOrderNo" placeholder="—"></div>
+          <div class="field"><label>Dispatch Doc No.</label><input id="dispatchDoc" placeholder="—"></div>
+          <div class="field"><label>Dispatched Through</label><input id="dispatchThrough" placeholder="—"></div>
+          <div class="field"><label>Destination</label><input id="destination" placeholder="—"></div>
+          <div class="field span-2"><label>Terms of Delivery</label><input id="termsDelivery" placeholder="Immediate Topay Basis"></div>
+          <div class="field span-2"><label>Mode / Terms of Payment</label><input id="payTerms" placeholder="100% Against Proforma Invoice"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Products -->
+  <div class="card">
+    <div class="card-head">Products / Line Items</div>
+    <div class="card-body">
+      <div class="product-table-wrap">
+        <table class="product-table" id="productTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th style="min-width:210px">Description of Goods</th>
+              <th style="min-width:86px">HSN/SAC</th>
+              <th style="min-width:58px">Qty</th>
+              <th style="min-width:58px">UOM</th>
+              <th style="min-width:58px">PER</th>
+              <th style="min-width:90px">Rate (₹)</th>
+              <th style="min-width:58px">Tax %</th>
+              <th style="min-width:100px">Taxable Amt</th>
+              <th style="min-width:80px">CGST</th>
+              <th style="min-width:80px">SGST</th>
+              <th style="min-width:100px">Row Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="productBody"></tbody>
+        </table>
+      </div>
+      <button class="btn-add-row" onclick="addProductRow()">+ Add Product Row</button>
+    </div>
+  </div>
+
+  <!-- ROW 3: Totals -->
+  <div class="card">
+    <div class="card-head">Invoice Totals</div>
+    <div class="card-body">
+      <div class="totals-wrap">
+        <div style="flex:1;min-width:250px;">
+          <div style="font-size:0.63rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light);margin-bottom:8px;">HSN-wise Tax Summary</div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead>
+              <tr>
+                <th style="border:1px solid var(--rule);padding:5px 7px;background:var(--section-bg);text-align:left;font-size:0.63rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);">HSN/SAC</th>
+                <th style="border:1px solid var(--rule);padding:5px 7px;background:var(--section-bg);text-align:right;font-size:0.63rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);">Taxable</th>
+                <th style="border:1px solid var(--rule);padding:5px 7px;background:var(--section-bg);text-align:right;font-size:0.63rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);">CGST</th>
+                <th style="border:1px solid var(--rule);padding:5px 7px;background:var(--section-bg);text-align:right;font-size:0.63rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);">SGST</th>
+                <th style="border:1px solid var(--rule);padding:5px 7px;background:var(--section-bg);text-align:right;font-size:0.63rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);">Total Tax</th>
+              </tr>
+            </thead>
+            <tbody id="hsnSummaryBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <div class="totals-block">
+            <div class="totals-row"><span class="t-label">Sub Total (Taxable)</span><span class="t-val" id="tSubTotal">0.00</span></div>
+            <div class="totals-row"><span class="t-label">CGST Total</span><span class="t-val" id="tCgst">0.00</span></div>
+            <div class="totals-row"><span class="t-label">SGST Total</span><span class="t-val" id="tSgst">0.00</span></div>
+            <div class="totals-row"><span class="t-label">Round Off</span><span class="t-val" id="tRound">0.00</span></div>
+            <div class="totals-row grand"><span class="t-label">Grand Total</span><span class="t-val" id="tGrand">0.00</span></div>
+          </div>
+          <div class="amount-words" id="amountWords"><strong>Amount in Words:</strong> Zero Only</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Bank + Declaration -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head">Bank Details</div>
+      <div class="card-body">
+        <div class="grid-2">
+          <div class="field span-2"><label>A/C Holder Name</label><input id="bankName" placeholder="Abtek Flow Solutions LLP"></div>
+          <div class="field"><label>Bank Name</label><input id="bankBankName" placeholder="HDFC Bank Limited"></div>
+          <div class="field"><label>Account Number</label><input id="bankAccNo" placeholder="50200037057282"></div>
+          <div class="field span-2"><label>Branch &amp; IFSC Code</label><input id="bankIfsc" placeholder="Second Line Beach Road & HDFC0000166"></div>
+          <div class="field"><label>SWIFT Code (optional)</label><input id="bankSwift" placeholder="—"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">Declaration &amp; Signatory</div>
+      <div class="card-body">
+        <div class="field">
+          <label>Declaration Text</label>
+          <textarea id="declaration" rows="3">We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</textarea>
+        </div>
+        <hr class="divider">
+        <div class="field">
+          <label>Authorised Signatory Name</label>
+          <input id="signatory" placeholder="Authorised Signatory">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <div class="footer-bar">
+    <button class="btn-pdf" onclick="generatePDF()">⬇ Generate GST Invoice PDF</button>
+  </div>
+
+</div>
+
+<script>
+// ── PRODUCT ROWS (no item code, no unit, no discount)
+let rowCount = 0;
+
+function addProductRow() {
+  rowCount++;
+  const tbody = document.getElementById('productBody');
+  const tr = document.createElement('tr');
+  tr.id = 'row_' + rowCount;
+  tr.dataset.rowid = rowCount;
+  tr.innerHTML = `
+    <td style="text-align:center;font-weight:600;color:var(--ink-light);font-size:0.77rem;width:26px;">${rowCount}</td>
+    <td><input type="text" placeholder="BRV2S 25mm Reducing Valve Grey" style="min-width:185px;" oninput="calcRow(${rowCount})"></td>
+    <td><input type="text" placeholder="32089090" oninput="calcRow(${rowCount})"></td>
+    <td><input type="number" placeholder="1" min="0" step="any" oninput="calcRow(${rowCount})"></td>
+
+<td>
+  <input type="text" placeholder="Kg / Nos / Ml" 
+  value="Nos" oninput="calcRow(${rowCount})">
+</td>
+
+<td>
+  <input type="text" placeholder="Kg / Nos / Ml" 
+  value="Nos" oninput="calcRow(${rowCount})">
+</td>
+
+<td><input type="number" placeholder="34791.00" min="0" step="any" oninput="calcRow(${rowCount})"></td>
+
+<td><input type="number" placeholder="18" min="0" max="100" step="any" oninput="calcRow(${rowCount})"></td>
+    <td class="computed" id="taxable_${rowCount}">0.00</td>
+    <td class="computed" id="cgst_${rowCount}">0.00</td>
+    <td class="computed" id="sgst_${rowCount}">0.00</td>
+    <td class="computed" id="rowtotal_${rowCount}">0.00</td>
+    <td class="remove-cell"><button class="btn-remove" onclick="removeRow(${rowCount})" title="Remove">×</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeRow(id) {
+  const row = document.getElementById('row_' + id);
+  if (row) row.remove();
+  recalcAll();
+}
+
+function getRowInputs(id) {
+  const row = document.getElementById('row_' + id);
+  if (!row) return null;
+  const inputs = row.querySelectorAll('input');
+  return {
+    desc: inputs[0].value.trim(),
+    hsn:  inputs[1].value.trim(),
+    qty:  parseFloat(inputs[2].value) || 0,
+    uom:  inputs[3].value.trim(),
+    per:  inputs[4].value.trim(),
+    rate: parseFloat(inputs[5].value) || 0,
+    tax:  parseFloat(inputs[6].value) || 0,
+  };
+}
+
+function calcRow(id) {
+  const d = getRowInputs(id);
+  if (!d) return;
+  const taxable = d.qty * d.rate;
+  const cgstAmt = taxable * (d.tax / 2) / 100;
+  const sgstAmt = taxable * (d.tax / 2) / 100;
+  const total   = taxable + cgstAmt + sgstAmt;
+  document.getElementById('taxable_'  + id).textContent = fmt(taxable);
+  document.getElementById('cgst_'     + id).textContent = fmt(cgstAmt);
+  document.getElementById('sgst_'     + id).textContent = fmt(sgstAmt);
+  document.getElementById('rowtotal_' + id).textContent = fmt(total);
+  recalcAll();
+}
+
+function recalcAll() {
+  const rows = document.querySelectorAll('#productBody tr');
+  let subTotal = 0, cgstTotal = 0, sgstTotal = 0;
+  const hsnMap = {};
+  rows.forEach(tr => {
+    const id = tr.dataset.rowid;
+    const d  = getRowInputs(id);
+    if (!d) return;
+    const taxable = d.qty * d.rate;
+    const cgstAmt = taxable * (d.tax / 2) / 100;
+    const sgstAmt = taxable * (d.tax / 2) / 100;
+    subTotal  += taxable;
+    cgstTotal += cgstAmt;
+    sgstTotal += sgstAmt;
+    const key = d.hsn || 'Unknown';
+    if (!hsnMap[key]) hsnMap[key] = { taxable:0, cgst:0, sgst:0 };
+    hsnMap[key].taxable += taxable;
+    hsnMap[key].cgst    += cgstAmt;
+    hsnMap[key].sgst    += sgstAmt;
+  });
+  const grandExact = subTotal + cgstTotal + sgstTotal;
+  const grandRound = Math.round(grandExact);
+  const roundOff   = grandRound - grandExact;
+  document.getElementById('tSubTotal').textContent = fmt(subTotal);
+  document.getElementById('tCgst').textContent     = fmt(cgstTotal);
+  document.getElementById('tSgst').textContent     = fmt(sgstTotal);
+  document.getElementById('tRound').textContent    = fmt(roundOff);
+  document.getElementById('tGrand').textContent    = fmt(grandRound);
+  document.getElementById('amountWords').innerHTML =
+    `<strong>Amount in Words:</strong> INR ${numberToWords(grandRound)} Only`;
+  const hsnBody = document.getElementById('hsnSummaryBody');
+  hsnBody.innerHTML = '';
+  let tT=0,tC=0,tS=0;
+  Object.entries(hsnMap).forEach(([hsn,v]) => {
+    tT+=v.taxable; tC+=v.cgst; tS+=v.sgst;
+    hsnBody.innerHTML += `<tr>
+      <td style="border:1px solid var(--rule);padding:4px 7px;">${hsn}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(v.taxable)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(v.cgst)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(v.sgst)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(v.cgst+v.sgst)}</td>
+    </tr>`;
+  });
+  if (Object.keys(hsnMap).length) {
+    hsnBody.innerHTML += `<tr style="background:var(--section-bg);font-weight:600;">
+      <td style="border:1px solid var(--rule);padding:4px 7px;">Total</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(tT)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(tC)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(tS)}</td>
+      <td style="border:1px solid var(--rule);padding:4px 7px;text-align:right;">${fmt(tC+tS)}</td>
+    </tr>`;
+  }
+}
+
+function fmt(n) { return parseFloat(n||0).toFixed(2); }
+
+// ── NUMBER TO WORDS
+function numberToWords(num) {
+  if (num===0) return 'Zero';
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+    'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function words(n) {
+    if (n<20) return ones[n];
+    if (n<100) return tens[Math.floor(n/10)]+(n%10?' '+ones[n%10]:'');
+    if (n<1000) return ones[Math.floor(n/100)]+' Hundred'+(n%100?' '+words(n%100):'');
+    if (n<100000) return words(Math.floor(n/1000))+' Thousand'+(n%1000?' '+words(n%1000):'');
+    if (n<10000000) return words(Math.floor(n/100000))+' Lakh'+(n%100000?' '+words(n%100000):'');
+    return words(Math.floor(n/10000000))+' Crore'+(n%10000000?' '+words(n%10000000):'');
+  }
+  const intPart=Math.floor(num);
+  const decPart=Math.round((num-intPart)*100);
+  return words(intPart)+(decPart>0?' and '+words(decPart)+' Paise':'');
+}
+
+// ── COLLECT
+function v(id) { const el=document.getElementById(id); return el?el.value.trim():''; }
+
+function collectData() {
+  const rows = document.querySelectorAll('#productBody tr');
+  const products = [];
+  rows.forEach(tr => {
+    const id=tr.dataset.rowid;
+    const d=getRowInputs(id);
+    if(!d) return;
+    const taxable=d.qty*d.rate;
+    const cgstAmt=taxable*(d.tax/2)/100;
+    const sgstAmt=taxable*(d.tax/2)/100;
+    products.push({...d, taxable, cgstAmt, sgstAmt, total:taxable+cgstAmt+sgstAmt});
+  });
+  const subTotal=products.reduce((s,p)=>s+p.taxable,0);
+  const cgstTotal=products.reduce((s,p)=>s+p.cgstAmt,0);
+  const sgstTotal=products.reduce((s,p)=>s+p.sgstAmt,0);
+  const grandExact=subTotal+cgstTotal+sgstTotal;
+  const grandRound=Math.round(grandExact);
+  const roundOff=grandRound-grandExact;
+  const hsnMap={};
+  products.forEach(p=>{
+    const k=p.hsn||'Unknown';
+    if(!hsnMap[k]) hsnMap[k]={taxable:0,cgst:0,sgst:0};
+    hsnMap[k].taxable+=p.taxable; hsnMap[k].cgst+=p.cgstAmt; hsnMap[k].sgst+=p.sgstAmt;
+  });
+  return {
+    seller:{name:v('sellerName'),addr1:v('sellerAddr1'),addr2:v('sellerAddr2'),city:v('sellerCity'),
+            pin:v('sellerPin'),gstin:v('sellerGstin'),state:v('sellerState'),code:v('sellerCode'),
+            email:v('sellerEmail'),phone:v('sellerPhone')},
+    buyer:{name:v('buyerName'),addr:v('buyerAddr'),gstin:v('buyerGstin'),
+           state:v('buyerState'),stateCode:v('buyerStateCode'),supply:v('placeOfSupply')},
+    inv:{no:v('invNo'),date:v('invDate'),delivNote:v('delivNote'),buyerOrder:v('buyerOrderNo'),
+         dispDoc:v('dispatchDoc'),dispThru:v('dispatchThrough'),dest:v('destination'),
+         termsDeliv:v('termsDelivery'),payTerms:v('payTerms')},
+    bank:{name:v('bankName'),bank:v('bankBankName'),acc:v('bankAccNo'),ifsc:v('bankIfsc'),swift:v('bankSwift')},
+    declaration:v('declaration'), signatory:v('signatory'),
+    products, totals:{subTotal,cgstTotal,sgstTotal,roundOff,grandRound},
+    hsnMap, amountWords:numberToWords(grandRound),
+  };
+}
+
+// ── PDF
+function generatePDF() {
+  const data = collectData();
+
+  const hdr = (text, align) => ({
+    text, fontSize: 7, bold: true,
+    alignment: align||'center', color:'#222',
+    margin: [2,4,2,4], fillColor:'#edeae4',
+  });
+
+  const invDate = data.inv.date
+    ? new Date(data.inv.date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})
+    : '—';
+
+  // product rows
+  const productRows = data.products.map((p,i) => [
+    {text:i+1, fontSize:8, alignment:'center', margin:[1,4,1,4]},
+    {text:p.desc||'—', fontSize:8.5, margin:[3,4,3,4]},
+    {text:p.hsn||'—', fontSize:8, alignment:'center', margin:[2,4,2,4]},
+{text:p.uom || '-', fontSize:8, alignment:'center', margin:[2,4,2,4]},
+{text:String(p.qty), fontSize:8, alignment:'center', margin:[2,4,2,4]},
+{text:p.per || '-', fontSize:8, alignment:'center', margin:[2,4,2,4]},
+{text:fmt(p.rate), fontSize:8, alignment:'right', margin:[2,4,4,4]},
+    {text:`${p.tax}%`, fontSize:8, alignment:'center', margin:[2,4,2,4]},
+    {text:fmt(p.taxable), fontSize:8, alignment:'right', margin:[2,4,4,4]},
+    {text:fmt(p.cgstAmt), fontSize:8, alignment:'right', margin:[2,4,4,4]},
+    {text:fmt(p.sgstAmt), fontSize:8, alignment:'right', margin:[2,4,4,4]},
+    {text:fmt(p.total), fontSize:8.5, bold:true, alignment:'right', margin:[2,4,4,4]},
+  ]);
+
+  const fillerRows = Array(Math.max(0,3-data.products.length)).fill(
+    Array(12).fill({text:'', fontSize:8, margin:[2,9,2,9]})
+  );
+
+  const totalRow = [
+  {
+    text:'Total',
+    fontSize:8,
+    bold:true,
+    colSpan:6,
+    alignment:'right',
+    fillColor:'#edeae4',
+    margin:[2,4,6,4]
+  },
+  {}, {}, {}, {}, {},
+
+  {
+    text:String(data.products.reduce((s,p)=>s+p.qty,0)),
+    fontSize:8,
+    bold:true,
+    alignment:'center',
+    fillColor:'#edeae4',
+    margin:[2,4,2,4]
+  },
+
+  {
+    text:'',
+    fillColor:'#edeae4'
+  },
+
+  {
+    text:fmt(data.totals.subTotal),
+    fontSize:8.5,
+    bold:true,
+    alignment:'right',
+    fillColor:'#edeae4',
+    margin:[2,4,4,4]
+  },
+
+  {
+    text:fmt(data.totals.cgstTotal),
+    fontSize:8.5,
+    bold:true,
+    alignment:'right',
+    fillColor:'#edeae4',
+    margin:[2,4,4,4]
+  },
+
+  {
+    text:fmt(data.totals.sgstTotal),
+    fontSize:8.5,
+    bold:true,
+    alignment:'right',
+    fillColor:'#edeae4',
+    margin:[2,4,4,4]
+  },
+
+  {
+    text:`₹ ${fmt(data.totals.grandRound)}`,
+    fontSize:8.5,
+    bold:true,
+    alignment:'right',
+    fillColor:'#edeae4',
+    margin:[2,4,4,4]
+  }
+];
+  // hsn rows
+  const hsnRows = Object.entries(data.hsnMap).map(([hsn,v]) => [
+    {text:hsn, fontSize:8, margin:[3,3,3,3]},
+    {text:fmt(v.taxable), fontSize:8, alignment:'right', margin:[2,3,4,3]},
+    {text:fmt(v.cgst),    fontSize:8, alignment:'right', margin:[2,3,4,3]},
+    {text:fmt(v.sgst),    fontSize:8, alignment:'right', margin:[2,3,4,3]},
+    {text:fmt(v.cgst+v.sgst), fontSize:8, alignment:'right', margin:[2,3,4,3]},
+  ]);
+  const tT=Object.values(data.hsnMap).reduce((s,x)=>s+x.taxable,0);
+  const tC=Object.values(data.hsnMap).reduce((s,x)=>s+x.cgst,0);
+  const tS=Object.values(data.hsnMap).reduce((s,x)=>s+x.sgst,0);
+  hsnRows.push([
+    {text:'Total',fontSize:8,bold:true,fillColor:'#edeae4',margin:[3,3,3,3]},
+    {text:fmt(tT),fontSize:8,bold:true,alignment:'right',fillColor:'#edeae4',margin:[2,3,4,3]},
+    {text:fmt(tC),fontSize:8,bold:true,alignment:'right',fillColor:'#edeae4',margin:[2,3,4,3]},
+    {text:fmt(tS),fontSize:8,bold:true,alignment:'right',fillColor:'#edeae4',margin:[2,3,4,3]},
+    {text:fmt(tC+tS),fontSize:8,bold:true,alignment:'right',fillColor:'#edeae4',margin:[2,3,4,3]},
+  ]);
+
+  const bdr = {
+    hLineWidth:()=>0.6, vLineWidth:()=>0.6,
+    hLineColor:()=>'#1a1a1a', vLineColor:()=>'#1a1a1a',
+  };
+  const thinBdr = {
+    hLineWidth:()=>0.35, vLineWidth:()=>0.35,
+    hLineColor:()=>'#999', vLineColor:()=>'#999',
+  };
+
+  // ── SELLER STACK
+  const sellerStack = [
+    {text:data.seller.name||'Company Name', fontSize:10.5, bold:true, margin:[0,0,0,2]},
+    {text:[data.seller.addr1,data.seller.addr2].filter(Boolean).join(', '), fontSize:7.5},
+    {text:[data.seller.city,data.seller.pin].filter(Boolean).join(' – '), fontSize:7.5},
+    {text:`GSTIN/UIN : ${data.seller.gstin||'—'}`, fontSize:7.5, margin:[0,3,0,0]},
+    {text:`State : ${data.seller.state||'—'}  |  Code : ${data.seller.code||'—'}`, fontSize:7.5},
+    {text:`E-Mail : ${data.seller.email||'—'}`, fontSize:7.5},
+    {text:`Ph : ${data.seller.phone||'—'}`, fontSize:7.5},
+  ];
+
+  // ── BUYER BLOCK (inline, compact)
+  const buyerInlineBlock = (label) => ({
+    stack:[
+      {text:label, fontSize:6, color:'#888', margin:[0,0,0,1]},
+      {text:data.buyer.name||'—', fontSize:8.5, bold:true, margin:[0,0,0,1]},
+      {text:data.buyer.addr||'—', fontSize:7},
+      {text:`GSTIN/UIN : ${data.buyer.gstin||'—'}`, fontSize:7, margin:[0,2,0,0]},
+      {text:`State : ${data.buyer.state||'—'}  Code : ${data.buyer.stateCode||'—'}`, fontSize:7},
+      {text:`Place of Supply : ${data.buyer.supply||'—'}`, fontSize:7},
+    ],
+    margin:[0,0,0,0],
+  });
+
+  // invoice detail pair helper
+  const invPair = (lbl, val) => [
+    {text:lbl, fontSize:6.5, color:'#666', margin:[3,3,3,0]},
+    {text:val||'—', fontSize:8, margin:[3,0,3,3]},
+  ];
+
+  const docDefinition = {
+    pageSize:'A4',
+    pageOrientation:'portrait',
+    pageMargins:[25,25,25,34],
+    defaultStyle:{font:'Roboto', fontSize:8.5, color:'#1a1a1a'},
+
+    footer:(currentPage,pageCount)=>({
+      columns:[
+        {text:'This is a Computer Generated Invoice', fontSize:6.5, color:'#aaa', italics:true, alignment:'center', margin:[0,5,0,0]},
+        {text:`Page ${currentPage} of ${pageCount}`, fontSize:6.5, color:'#aaa', alignment:'right', margin:[0,5,25,0]},
+      ],
+    }),
+
+    content:[
+
+      // TITLE
+      {text:'Tax Invoice', fontSize:14, bold:true, alignment:'center', decoration:'underline', margin:[0,0,0,5]},
+
+      // SECTION 1: Seller+Buyers (left) | Invoice details (right)
+      {
+        table:{
+          widths:['50%','50%'],
+          body:[[
+            // Left: seller + two buyer blocks
+            {
+              stack:[
+                ...sellerStack,
+                {canvas:[{type:'line',x1:0,y1:5,x2:240,y2:5,lineWidth:0.4,lineColor:'#ccc'}]},
+                {margin:[0,4,0,0], ...buyerInlineBlock('Consignee (Ship to)')},
+                {canvas:[{type:'line',x1:0,y1:4,x2:240,y2:4,lineWidth:0.4,lineColor:'#ddd'}]},
+                {margin:[0,4,0,0], ...buyerInlineBlock('Buyer (Bill to)')},
+              ],
+              margin:[4,4,4,4],
+            },
+            // Right: invoice details as nested table
+            {
+              table:{
+                widths:['50%','50%'],
+                body:[
+                  invPair('Invoice No.', data.inv.no),
+                  invPair('Dated', invDate),
+                  invPair('Delivery Note', data.inv.delivNote),
+                  invPair('Mode/Terms of Payment', data.inv.payTerms),
+                  invPair("Buyer's Order No.", data.inv.buyerOrder),
+                  invPair('Dispatch Doc No.', data.inv.dispDoc),
+                  invPair('Dispatched Through', data.inv.dispThru),
+                  invPair('Destination', data.inv.dest),
+                  [{text:'Terms of Delivery', fontSize:6.5, color:'#666', colSpan:2, margin:[3,3,3,0]},{}],
+                  [{text:data.inv.termsDeliv||'—', fontSize:9, bold:true, colSpan:2, margin:[3,0,3,5]},{}],
+                ],
+              },
+              layout:thinBdr,
+            },
+          ]],
+        },
+        layout:bdr,
+        margin:[0,0,0,0],
+      },
+
+      // ITEM TABLE
+      {
+        table:{
+          headerRows:1,
+          widths:[16,'*',45,28,35,35,45,28,52,40,40,52],
+          body:[
+            [
+              hdr('Sl\nNo.'),
+              hdr('Description of Goods','left'),
+              hdr('Model'),
+              hdr('Printing Matter'),
+              hdr('Qty'),
+              hdr('Per'),
+              hdr('Rate (₹)'),
+              hdr('Tax\n%'),
+              hdr('Taxable\nAmt'),
+              hdr('CGST\nAmt'),
+              hdr('SGST\nAmt'),
+              hdr('Amount'),
+            ],
+            ...productRows,
+            ...fillerRows,
+            totalRow,
+          ],
+        },
+        layout:{
+          hLineWidth:(i,node)=>(i===0||i===1||i===node.table.body.length)?0.8:0.3,
+          vLineWidth:(i,node)=>(i===0||i===node.table.widths.length)?0.8:0.3,
+          hLineColor:()=>'#1a1a1a', vLineColor:()=>'#1a1a1a',
+        },
+        margin:[0,0,0,0],
+      },
+
+      // AMOUNT IN WORDS + OUTPUT TAXES
+      {
+        table:{
+          widths:['55%','23%','22%'],
+          body:[[
+            {
+              text:[
+                {text:'Amount Chargeable (in words)\n', fontSize:6.5, color:'#666'},
+                {text:`INR ${data.amountWords} Only`, fontSize:8.5, bold:true, italics:true},
+              ],
+              margin:[4,4,4,4],
+            },
+            {
+              stack:[
+                {text:'Output CGST', fontSize:7, alignment:'right', color:'#555'},
+                {text:'Output SGST', fontSize:7, alignment:'right', color:'#555'},
+                {text:'Round Off',   fontSize:7, alignment:'right', color:'#555'},
+              ],
+              margin:[2,5,4,4],
+            },
+            {
+              stack:[
+                {text:fmt(data.totals.cgstTotal), fontSize:7, alignment:'right'},
+                {text:fmt(data.totals.sgstTotal), fontSize:7, alignment:'right'},
+                {text:fmt(data.totals.roundOff),  fontSize:7, alignment:'right'},
+              ],
+              margin:[2,5,4,4],
+            },
+          ]],
+        },
+        layout:{hLineWidth:(i)=>i===0?0:0.6,vLineWidth:()=>0.6,hLineColor:()=>'#1a1a1a',vLineColor:()=>'#1a1a1a'},
+      },
+
+      // GRAND TOTAL BAR
+      {
+        table:{
+          widths:['*','auto'],
+          body:[[
+            {text:[{text:'Grand Total   ',fontSize:8.5,bold:true},{text:`₹ ${fmt(data.totals.grandRound)}`,fontSize:11,bold:true}],
+             alignment:'right', fillColor:'#1a1a1a', color:'#fff', margin:[4,5,8,5]},
+            {text:'E. & O.E.', fontSize:6.5, color:'#fff', fillColor:'#1a1a1a', alignment:'right', margin:[0,7,4,5]},
+          ]],
+        },
+        layout:'noBorders',
+        margin:[0,0,0,0],
+      },
+
+      // HSN TAX SUMMARY
+      // {
+      //   table:{
+      //     widths:['*',58,52,52,52],
+      //     body:[
+      //       [hdr('HSN/SAC','left'),hdr('Taxable Value'),hdr('CGST Amt'),hdr('SGST Amt'),hdr('Total Tax')],
+      //       ...hsnRows,
+      //     ],
+      //   },
+      //   layout:thinBdr,
+      //   margin:[0,0,0,0],
+      // },
+
+      // TAX IN WORDS
+      {
+        table:{widths:['100%'],body:[[{
+          text:[
+            {text:'Tax Amount (in words): ',fontSize:7,bold:true},
+            {text:`INR ${numberToWords(data.totals.cgstTotal+data.totals.sgstTotal)} Only`,fontSize:7,italics:true},
+          ],
+          margin:[4,3,4,3],
+        }]]},
+        layout:{hLineWidth:(i)=>i===0?0:0.6,vLineWidth:()=>0,hLineColor:()=>'#1a1a1a'},
+      },
+
+      // BOTTOM SECTION: Bank+Declaration (left) | Signature (right)
+      // Signature has Customer Seal at bottom-left and Authorised Signatory at bottom-right
+      {
+        table:{
+          widths:['55%','45%'],
+          body:[[
+            // Left: bank + declaration
+            {
+              stack:[
+                {text:"Company's Bank Details", fontSize:8, bold:true, margin:[0,0,0,3]},
+                {
+                  table:{
+                    widths:['auto','*'],
+                    body:[
+                      [{text:'A/c Holder',  fontSize:7,color:'#666',margin:[0,1,8,1]},{text:data.bank.name||'—', fontSize:7.5,margin:[0,1,0,1]}],
+                      [{text:'Bank Name',   fontSize:7,color:'#666',margin:[0,1,8,1]},{text:data.bank.bank||'—', fontSize:7.5,margin:[0,1,0,1]}],
+                      [{text:'A/c No.',     fontSize:7,color:'#666',margin:[0,1,8,1]},{text:data.bank.acc||'—',  fontSize:7.5,bold:true,margin:[0,1,0,1]}],
+                      [{text:'Branch & IFS',fontSize:7,color:'#666',margin:[0,1,8,1]},{text:data.bank.ifsc||'—',fontSize:7.5,margin:[0,1,0,1]}],
+                      [{text:'SWIFT Code',  fontSize:7,color:'#666',margin:[0,1,8,1]},{text:data.bank.swift||'—',fontSize:7.5,margin:[0,1,0,1]}],
+                    ],
+                  },
+                  layout:'noBorders',
+                },
+                {canvas:[{type:'line',x1:0,y1:6,x2:210,y2:6,lineWidth:0.35,lineColor:'#ccc'}]},
+                {text:'Declaration', fontSize:8, bold:true, margin:[0,5,0,2]},
+                {text:data.declaration||'—', fontSize:7, italics:true, color:'#444', lineHeight:1.4},
+              ],
+              margin:[4,4,4,6],
+            },
+            // Right: company name top, then Customer Seal + Signatory at bottom
+            {
+              stack:[
+                {text:`for ${data.seller.name||'Company Name'}`, fontSize:8, bold:true, alignment:'center', margin:[0,0,0,6]},
+                // spacer
+                {text:'', margin:[0,18,0,0]},
+                // bottom row: seal left | signatory right
+                {
+                  columns:[
+                    {
+                      stack:[
+                        {canvas:[{type:'rect',x:0,y:0,w:82,h:38,lineWidth:0.5,lineColor:'#bbb'}]},
+                        {text:"Customer's Seal &\nSignature", fontSize:6.5, color:'#888', alignment:'center', margin:[0,4,0,0]},
+                      ],
+                      width:90,
+                    },
+                    {text:'', width:'*'},
+                    {
+                      stack:[
+                        {canvas:[{type:'rect',x:0,y:0,w:82,h:38,lineWidth:0.5,lineColor:'#bbb',dash:{length:3}}]},
+                        {
+                          text:(data.signatory||'Authorised Signatory')+'\nAuthorised Signatory',
+                          fontSize:6.5, alignment:'center', color:'#444', margin:[0,4,0,0],
+                        },
+                      ],
+                      width:90,
+                    },
+                  ],
+                  margin:[0,0,0,0],
+                },
+              ],
+              margin:[4,4,4,4],
+            },
+          ]],
+        },
+        layout:bdr,
+        margin:[0,0,0,0],
+      },
+
+    ],
+  };
+
+  const invNo = data.inv.no ? `Invoice_${data.inv.no}` : 'GST_Invoice';
+  pdfMake.createPdf(docDefinition).download(`${invNo}.pdf`);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('invDate').value = new Date().toISOString().split('T')[0];
+  addProductRow();
+});
+</script>
+</body>
+</html>
